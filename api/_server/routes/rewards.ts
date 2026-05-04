@@ -18,6 +18,90 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     }
 });
 
+// GET /api/rewards/all — list ALL rewards incl. inactive (teacher management)
+router.get('/all', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+        const rewards = await prisma.reward.findMany({ orderBy: { coinCost: 'asc' } });
+        res.json(rewards);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch rewards' });
+    }
+});
+
+// POST /api/rewards — create a new reward (teacher)
+router.post('/', authenticateToken, async (req: AuthRequest, res) => {
+    const { title, description, icon, coinCost, stock, imageUrl } = req.body;
+    if (!title || !description || coinCost === undefined) {
+        return res.status(400).json({ error: 'title, description and coinCost are required' });
+    }
+    try {
+        const reward = await prisma.reward.create({
+            data: {
+                title,
+                description,
+                icon: icon || '🎁',
+                coinCost: parseInt(coinCost),
+                stock: stock !== undefined && stock !== '' ? parseInt(stock) : null,
+                imageUrl: imageUrl || null,
+                isActive: true,
+            }
+        });
+        res.json(reward);
+    } catch (error) {
+        console.error('[REWARDS] Create error:', error);
+        res.status(500).json({ error: 'Failed to create reward' });
+    }
+});
+
+// PUT /api/rewards/:id — update a reward (teacher)
+router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { title, description, icon, coinCost, stock, imageUrl, isActive } = req.body;
+    try {
+        const reward = await prisma.reward.update({
+            where: { id },
+            data: {
+                ...(title !== undefined && { title }),
+                ...(description !== undefined && { description }),
+                ...(icon !== undefined && { icon }),
+                ...(coinCost !== undefined && { coinCost: parseInt(coinCost) }),
+                ...(stock !== undefined && { stock: stock === '' || stock === null ? null : parseInt(stock) }),
+                ...(imageUrl !== undefined && { imageUrl: imageUrl || null }),
+                ...(isActive !== undefined && { isActive }),
+            }
+        });
+        res.json(reward);
+    } catch (error) {
+        console.error('[REWARDS] Update error:', error);
+        res.status(500).json({ error: 'Failed to update reward' });
+    }
+});
+
+// PATCH /api/rewards/:id/toggle — toggle active/inactive
+router.patch('/:id/toggle', authenticateToken, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        const current = await prisma.reward.findUnique({ where: { id } });
+        if (!current) return res.status(404).json({ error: 'Reward not found' });
+        const updated = await prisma.reward.update({ where: { id }, data: { isActive: !current.isActive } });
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to toggle reward' });
+    }
+});
+
+// DELETE /api/rewards/:id — delete a reward (teacher)
+router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    try {
+        await prisma.reward.delete({ where: { id } });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[REWARDS] Delete error:', error);
+        res.status(500).json({ error: 'Failed to delete reward' });
+    }
+});
+
 // POST /api/rewards/redeem/:rewardId — redeem a reward
 router.post('/redeem/:rewardId', authenticateToken, async (req: AuthRequest, res) => {
     const userId = req.user?.id;
@@ -27,7 +111,6 @@ router.post('/redeem/:rewardId', authenticateToken, async (req: AuthRequest, res
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     try {
-        // Fetch reward and user in parallel
         const [reward, user] = await Promise.all([
             prisma.reward.findUnique({ where: { id: rewardId } }),
             prisma.user.findUnique({ where: { id: userId } })
@@ -43,16 +126,9 @@ router.post('/redeem/:rewardId', authenticateToken, async (req: AuthRequest, res
             return res.status(400).json({ error: `Not enough coins. You need ${reward.coinCost} coins but have ${user.coins}.` });
         }
 
-        // Deduct coins, create redemption, decrement stock — all in a transaction
         const [redemption] = await prisma.$transaction([
             prisma.redemption.create({
-                data: {
-                    userId,
-                    rewardId,
-                    receiverName,
-                    receiverPhone,
-                    receiverAddress
-                }
+                data: { userId, rewardId, receiverName, receiverPhone, receiverAddress }
             }),
             prisma.user.update({
                 where: { id: userId },

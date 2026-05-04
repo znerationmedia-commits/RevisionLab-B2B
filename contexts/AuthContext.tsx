@@ -72,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             setUser(data.user);
             localStorage.setItem('quest_token', data.token);
+            localStorage.setItem('quest_user_role', JSON.stringify({ role: data.user.role, isAdmin: data.user.isAdmin }));
             setIsLoading(false);
             return true;
         } catch (error) {
@@ -108,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             setUser(data.user);
             localStorage.setItem('quest_token', data.token);
+            localStorage.setItem('quest_user_role', JSON.stringify({ role: data.user.role, isAdmin: data.user.isAdmin }));
             setIsLoading(false);
             return true;
         } catch (error) {
@@ -147,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         localStorage.removeItem('quest_token');
         localStorage.removeItem('quest_user');
+        localStorage.removeItem('quest_user_role');
     };
 
     const subscribe = async () => {

@@ -31,6 +31,8 @@ import rewardRoutes from './_server/routes/rewards.js';
 import questionBankRoutes from './questionBank.js';
 import paperFilesRoutes from './_server/routes/paperFiles.js';
 import studyPlansRoutes from './_server/routes/studyPlans.js';
+import classroomRoutes from './_server/routes/classrooms.js';
+import assignmentRoutes from './_server/routes/assignments.js';
 
 const app = express();
 console.log("[VERCEL] Starting serverless function...");
@@ -59,6 +61,8 @@ app.use('/api/rewards', rewardRoutes);
 app.use('/api/question-bank', questionBankRoutes);
 app.use('/api/paper-files', paperFilesRoutes);
 app.use('/api/study-plans', studyPlansRoutes);
+app.use('/api/classrooms', classroomRoutes);
+app.use('/api/assignments', assignmentRoutes);
 
 app.get('/api', (req, res) => {
     res.send('RevisionLab API is running on Vercel');

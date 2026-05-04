@@ -3,6 +3,7 @@ import { Card } from './Card';
 import { Button } from './Button';
 import { ArrowLeft, LogIn, Mail, Loader2, KeyRound, ShieldCheck, Lock, Eye, EyeOff, CheckCircle2, X } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface LoginModalProps {
     onClose: () => void;
@@ -60,8 +61,26 @@ const OtpInput = ({ value, onChange }: { value: string; onChange: (v: string) =>
     />
 );
 
+/** Returns the dashboard path for a user based on their role. */
+const dashboardFor = (user: { isAdmin?: boolean; role?: string } | null | undefined): string => {
+    if (!user) return '/';
+    if (user.isAdmin) return '/admin';
+    if (user.role === 'teacher') return '/teacher';
+    return '/dashboard';
+};
+
+/** Reads the most recently logged-in user from localStorage (set by AuthContext on login). */
+const getStoredUserRole = (): { isAdmin?: boolean; role?: string } | null => {
+    try {
+        const raw = localStorage.getItem('quest_user_role');
+        if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+};
+
 export const LoginModal = ({ onClose }: LoginModalProps) => {
-    const { login, signup, verifyCode, resendCode } = useAuth();
+    const { login, signup, verifyCode, resendCode, user: authUser } = useAuth();
+    const navigate = useNavigate();
     const [view, setView] = useState<ModalView>('login');
     const [isSignUp, setIsSignUp] = useState(false);
 
@@ -69,7 +88,7 @@ export const LoginModal = ({ onClose }: LoginModalProps) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
-    const [role, setRole] = useState<'student' | 'teacher'>('teacher');
+    const [role, setRole] = useState<'student' | 'teacher'>('student');
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -88,7 +107,10 @@ export const LoginModal = ({ onClose }: LoginModalProps) => {
     const handleVerify = () => wrap(async () => {
         if (!code) { alert('Please enter the 6-digit code.'); return; }
         const ok = await verifyCode(email, code);
-        if (ok) onClose();
+        if (ok) {
+            onClose();
+            navigate(dashboardFor(getStoredUserRole()));
+        }
     });
 
     const handleResend = () => wrap(async () => { await resendCode(email); });
@@ -100,12 +122,18 @@ export const LoginModal = ({ onClose }: LoginModalProps) => {
             if (!name || !password) { alert('Please fill in all fields.'); return; }
             const r = await signup(name, email, password, role);
             if (typeof r === 'object' && r.needsVerification) { setEmail(r.email); setView('verify'); }
-            else if (r === true) onClose();
+            else if (r === true) {
+                onClose();
+                navigate(dashboardFor(getStoredUserRole()));
+            }
         } else {
             if (!password) { alert('Please enter your password.'); return; }
             const r = await login(email, password);
             if (typeof r === 'object' && r.needsVerification) { setEmail(r.email); setView('verify'); }
-            else if (r === true) onClose();
+            else if (r === true) {
+                onClose();
+                navigate(dashboardFor(getStoredUserRole()));
+            }
         }
     });
 
@@ -298,6 +326,39 @@ export const LoginModal = ({ onClose }: LoginModalProps) => {
                             <label className="block text-xs font-bold uppercase text-brand-dark/50 mb-1">Full Name</label>
                             <input type="text" value={name} onChange={e => setName(e.target.value)}
                                 className="w-full p-3 rounded-lg border-2 border-brand-dark/10" placeholder="e.g. Ali bin Abu" />
+                        </div>
+                    )}
+
+                    {/* Role selector — only shown during sign-up */}
+                    {isSignUp && (
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-brand-dark/50 mb-2">I am a…</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setRole('student')}
+                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 font-bold text-sm transition-all ${
+                                        role === 'student'
+                                            ? 'border-brand-blue bg-brand-blue/5 text-brand-blue'
+                                            : 'border-brand-dark/10 text-brand-dark/50 hover:border-brand-dark/30'
+                                    }`}
+                                >
+                                    <span className="text-xl">🎓</span>
+                                    Student
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRole('teacher')}
+                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 font-bold text-sm transition-all ${
+                                        role === 'teacher'
+                                            ? 'border-brand-orange bg-brand-orange/5 text-brand-orange'
+                                            : 'border-brand-dark/10 text-brand-dark/50 hover:border-brand-dark/30'
+                                    }`}
+                                >
+                                    <span className="text-xl">🏫</span>
+                                    Teacher
+                                </button>
+                            </div>
                         </div>
                     )}
 

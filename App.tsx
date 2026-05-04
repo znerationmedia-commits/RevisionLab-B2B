@@ -27,6 +27,8 @@ import RewardsShop from './components/RewardsShop';
 import { PastYearSelector } from './components/PastYearSelector';
 import { FeaturedPapers } from './components/FeaturedPapers';
 import { DataAnalysis } from './components/DataAnalysis';
+import { StudentClassrooms } from './components/StudentClassrooms';
+import { ClassroomManager } from './components/ClassroomManager';
 
 const INITIAL_STATS: UserStats = {
   xp: 0,
@@ -59,7 +61,7 @@ const SUBJECTS = [
   { id: Subject.COMPUTER_SCIENCE, icon: <span className="text-2xl">💻</span>, color: 'bg-slate-200' },
 ];
 
-import { useNavigate, Routes, Route, useLocation } from 'react-router-dom';
+import { useNavigate, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export default function App() {
@@ -145,6 +147,7 @@ export default function App() {
   const [currentStudyPlan, setCurrentStudyPlan] = useState<any | null>(null);
   const [loadingStudyPlan, setLoadingStudyPlan] = useState(false);
   const [mustAutoStart, setMustAutoStart] = useState(false);
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
 
   // Deep Linking / Quick Start Effect
   useEffect(() => {
@@ -176,7 +179,19 @@ export default function App() {
         navigate('/practice');
       } else if (mode === 'custom') {
         setGameMode('CUSTOM');
-        if (autoStart) setMustAutoStart(true);
+        const qId = query.get('questId');
+        const aId = query.get('assignmentId');
+        if (aId) setActiveAssignmentId(aId);
+        
+        if (qId) {
+          fetch('/api/quests').then(res => res.json()).then(data => {
+            const q = data.find((x: any) => x.id === qId);
+            if (q) {
+                setSelectedCustomQuest(q);
+                if (autoStart) setMustAutoStart(true);
+            }
+          });
+        }
         navigate('/practice');
       }
 
@@ -860,6 +875,19 @@ export default function App() {
     if (user) {
       try {
         const token = localStorage.getItem('quest_token');
+
+        if (activeAssignmentId) {
+          await fetch(`/api/assignments/${activeAssignmentId}/submit`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ score })
+          });
+          setActiveAssignmentId(null);
+        }
+
         const res = await fetch('/api/results', {
           method: 'POST',
           headers: {
@@ -1179,31 +1207,17 @@ export default function App() {
             </div>
             <h3 className="font-bold text-brand-dark mb-1">Rewards Shop</h3>
             <p className="text-xs text-brand-dark/60 mb-6 flex-1">
-              {user?.isSubscribed
-                ? 'Spend your hard-earned coins on exciting rewards and power-ups.'
-                : 'Exclusive for Pro members. Upgrade to unlock the rewards shop!'}
+              Spend your hard-earned coins on exciting rewards and power-ups.
             </p>
-            {user?.isSubscribed ? (
-              <Button
-                variant="primary"
-                size="sm"
-                fullWidth
-                className="bg-yellow-500 hover:bg-yellow-600 shadow-md shadow-yellow-500/20"
-                onClick={() => navigate('/rewards')}
-              >
-                <Coins size={14} className="mr-1.5" /> Visit Shop
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                fullWidth
-                className="border-yellow-400/40 text-yellow-600 hover:bg-yellow-50"
-                onClick={() => { if (!user) setShowLoginModal(true); else navigate('/pricing'); }}
-              >
-                <Lock size={14} className="mr-1.5" /> {user ? 'Upgrade to Unlock' : 'Log In'}
-              </Button>
-            )}
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              className="bg-yellow-500 hover:bg-yellow-600 shadow-md shadow-yellow-500/20"
+              onClick={() => { if (!user) setShowLoginModal(true); else navigate('/rewards'); }}
+            >
+              <Coins size={14} className="mr-1.5" /> {user ? 'Visit Shop' : 'Log In'}
+            </Button>
           </div>
         </Card>
 
@@ -1268,8 +1282,6 @@ export default function App() {
         }
       }} />
 
-      <Testimonials />
-      <FAQ />
     </div >
   );
 
@@ -1640,6 +1652,9 @@ export default function App() {
             </div>
           </div>
         )}
+
+        <div className="md:col-span-2 hidden">
+        </div>
 
         <div className="space-y-6 md:col-span-2">
           <DataAnalysis token={localStorage.getItem('quest_token') || ''} />
@@ -2030,9 +2045,8 @@ export default function App() {
         <div className="md:hidden fixed top-14 left-0 right-0 z-[60] bg-white/95 backdrop-blur-xl border-b border-brand-dark/10 shadow-xl animate-menu-slide-down">
           <div className="flex flex-col p-4 gap-1">
             <button onClick={() => { setShowMobileMenu(false); navigate('/'); setTimeout(() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' }), 200); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-dark/70 hover:bg-brand-blue/5 hover:text-brand-blue transition-all text-sm">📚 Courses</button>
-            <button onClick={() => { setShowMobileMenu(false); navigate('/pricing'); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-dark/70 hover:bg-brand-orange/5 hover:text-brand-orange transition-all text-sm">💰 Pricing</button>
-            <button onClick={() => { setShowMobileMenu(false); navigate('/'); setTimeout(() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' }), 200); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-dark/70 hover:bg-brand-blue/5 hover:text-brand-blue transition-all text-sm">⭐ Reviews</button>
-            <button onClick={() => { setShowMobileMenu(false); navigate('/'); setTimeout(() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }), 200); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-dark/70 hover:bg-brand-blue/5 hover:text-brand-blue transition-all text-sm">❓ FAQ</button>
+            <button onClick={() => { setShowMobileMenu(false); if (!user) setShowLoginModal(true); else navigate(user?.isAdmin ? '/admin' : user?.role === 'teacher' ? '/teacher' : '/dashboard'); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-dark/70 hover:bg-brand-blue/5 hover:text-brand-blue transition-all text-sm">📊 Dashboard</button>
+            <button onClick={() => { setShowMobileMenu(false); if (!user) setShowLoginModal(true); else navigate('/classrooms'); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-dark/70 hover:bg-brand-blue/5 hover:text-brand-blue transition-all text-sm">🏫 Classrooms</button>
             {user?.isSubscribed && (
               <button onClick={() => { setShowMobileMenu(false); navigate('/rewards'); }} className="text-left px-4 py-3 rounded-xl font-bold text-brand-orange hover:bg-brand-orange/5 transition-all text-sm">🛍️ Rewards</button>
             )}
@@ -2049,9 +2063,8 @@ export default function App() {
 
         <div className="hidden md:flex items-center gap-4 lg:gap-8 flex-1 justify-center px-4">
           <button onClick={() => { navigate('/'); setTimeout(() => document.getElementById('courses')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="font-bold text-brand-dark/60 hover:text-brand-blue transition-colors text-xs lg:text-sm whitespace-nowrap">Courses</button>
-          <button onClick={() => navigate('/pricing')} className="font-bold text-brand-dark/60 hover:text-brand-blue transition-colors text-xs lg:text-sm whitespace-nowrap">Pricing</button>
-          <button onClick={() => { navigate('/'); setTimeout(() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="font-bold text-brand-dark/60 hover:text-brand-blue transition-colors text-xs lg:text-sm whitespace-nowrap">Reviews</button>
-          <button onClick={() => { navigate('/'); setTimeout(() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="font-bold text-brand-dark/60 hover:text-brand-blue transition-colors text-xs lg:text-sm whitespace-nowrap">FAQ</button>
+          <button onClick={() => { if (!user) setShowLoginModal(true); else navigate(user?.isAdmin ? '/admin' : user?.role === 'teacher' ? '/teacher' : '/dashboard'); }} className="font-bold text-brand-dark/60 hover:text-brand-blue transition-colors text-xs lg:text-sm whitespace-nowrap">Dashboard</button>
+          <button onClick={() => { if (!user) setShowLoginModal(true); else navigate('/classrooms'); }} className="font-bold text-brand-dark/60 hover:text-brand-blue transition-colors text-xs lg:text-sm whitespace-nowrap">Classrooms</button>
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
@@ -2070,18 +2083,6 @@ export default function App() {
             <Button size="sm" onClick={() => setShowLoginModal(true)}>Log In</Button>
           ) : (
             <>
-              {user.isSubscribed && (
-                <div className="hidden sm:flex flex-col items-center bg-white/50 px-2 py-1 rounded-lg">
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-brand-green">
-                    <CheckCircle2 size={10} /> PRO
-                  </div>
-                  {user.subscriptionEndDate && (
-                    <div className="text-[8px] font-bold text-brand-dark/40">
-                      {getDaysRemaining(user.subscriptionEndDate)}d left
-                    </div>
-                  )}
-                </div>
-              )}
               {/* Rewards button - subscribers only */}
               {user?.isSubscribed && (
                 <button
@@ -2117,41 +2118,17 @@ export default function App() {
                       <p className="text-xs text-brand-dark/50 truncate">{user.email}</p>
                     </div>
                     <button
-                      onClick={() => { navigate('/dashboard'); setShowProfileMenu(false); }}
+                      onClick={() => {
+                        if (user?.isAdmin) navigate('/admin');
+                        else if (user?.role === 'teacher') navigate('/teacher');
+                        else navigate('/dashboard');
+                        setShowProfileMenu(false);
+                      }}
                       className="w-full text-left px-4 py-3 hover:bg-brand-blue/5 text-sm font-bold text-brand-dark/70 hover:text-brand-blue flex items-center gap-2 transition-colors"
                     >
-                      <UserIcon size={16} /> Dashboard
+                      <UserIcon size={16} />
+                      {user?.isAdmin ? 'Admin Dashboard' : user?.role === 'teacher' ? 'Teacher Dashboard' : 'My Dashboard'}
                     </button>
-                    {user?.isAdmin && (
-                      <button
-                        onClick={() => { navigate('/admin'); setShowProfileMenu(false); }}
-                        className="w-full text-left px-4 py-3 hover:bg-purple-50 text-sm font-bold text-purple-600 flex items-center gap-2 transition-colors"
-                      >
-                        ⚙️ Admin Dashboard
-                      </button>
-                    )}
-                    {user.isSubscribed && (
-                      <div className="px-4 py-2 bg-brand-orange/5 border-b border-brand-dark/5">
-                        <div className="flex justify-between items-center text-[10px] font-bold">
-                          <span className="text-brand-dark/40 uppercase">Status</span>
-                          <span className="text-brand-orange uppercase">Pro Active</span>
-                        </div>
-                        {user.subscriptionEndDate && (
-                          <div className="flex justify-between items-center text-[10px] font-bold mt-1">
-                            <span className="text-brand-dark/40 uppercase">Expires in</span>
-                            <span className="text-brand-dark">{getDaysRemaining(user.subscriptionEndDate)} days</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {user.isSubscribed && (
-                      <button
-                        onClick={() => { handleCancelSubscription(); setShowProfileMenu(false); }}
-                        className="w-full text-left px-4 py-3 hover:bg-brand-orange/5 text-sm font-bold text-brand-orange flex items-center gap-2 transition-colors"
-                      >
-                        <ShieldCheck size={16} /> Cancel Subscription
-                      </button>
-                    )}
                     <button
                       onClick={() => { logout(); setShowProfileMenu(false); }}
                       className="w-full text-left px-4 py-3 hover:bg-red-50 text-sm font-bold text-red-500 flex items-center gap-2 transition-colors"
@@ -2174,48 +2151,49 @@ export default function App() {
         {showLimitModal && <LimitReachedModal />}
         {showQuotaModal && <AiQuotaModal />}
 
-        {location.pathname === '/' && showPromo && (
-          <PromotionBanner
-            onClose={() => setShowPromo(false)}
-            onAction={() => navigate('/pricing')}
-          />
-        )}
-
         <Routes>
           <Route path="/" element={renderHome()} />
           <Route path="/pricing" element={renderPricing()} />
-          <Route path="/dashboard" element={<ProtectedRoute>{renderDashboard()}</ProtectedRoute>} />
-          <Route path="/rewards" element={
+
+          {/* Student dashboard — redirect teachers/admins to their own dashboards */}
+          <Route path="/dashboard" element={
             <ProtectedRoute>
-              {user?.isSubscribed ? renderRewards() : (
-                <div className="max-w-md mx-auto text-center py-20 px-4">
-                  <div className="w-24 h-24 bg-yellow-100 rounded-3xl flex items-center justify-center mx-auto mb-6 text-yellow-500">
-                    <Lock size={48} />
-                  </div>
-                  <h2 className="text-3xl font-display font-bold text-brand-dark mb-3">Pro Members Only</h2>
-                  <p className="text-brand-dark/60 mb-2 leading-relaxed">
-                    The Rewards Shop is exclusive to <span className="font-bold text-brand-orange">Pro subscribers</span>.
-                    Upgrade your plan to start spending your coins!
-                  </p>
-                  <p className="text-sm text-brand-dark/40 mb-8">You currently have <span className="font-bold text-yellow-600">{stats.coins || 0} coins</span> waiting.</p>
-                  <div className="flex flex-col gap-3">
-                    <Button fullWidth size="lg" className="bg-brand-orange hover:bg-orange-400 shadow-lg shadow-brand-orange/20" onClick={() => navigate('/pricing')}>
-                      <Sparkles size={18} className="mr-2" /> Upgrade to Pro
-                    </Button>
-                    <button onClick={() => navigate('/')} className="text-brand-dark/40 hover:text-brand-dark font-bold text-sm transition-colors py-2">
-                      Back to Home
-                    </button>
-                  </div>
-                </div>
-              )}
+              {user?.isAdmin
+                ? <Navigate to="/admin" replace />
+                : user?.role === 'teacher'
+                  ? <Navigate to="/teacher" replace />
+                  : renderDashboard()
+              }
             </ProtectedRoute>
           } />
-          <Route path="/admin/*" element={<ProtectedRoute adminOnly>{renderAdmin()}</ProtectedRoute>} />
+
+          <Route path="/rewards" element={
+            <ProtectedRoute>
+              {renderRewards()}
+            </ProtectedRoute>
+          } />
+
+          {/* Admin-only routes */}
+          <Route path="/admin/*" element={<ProtectedRoute requiredRole="admin">{renderAdmin()}</ProtectedRoute>} />
+
+          {/* Student practice routes */}
           <Route path="/practice" element={<ProtectedRoute>{renderGameSetup()}</ProtectedRoute>} />
           <Route path="/practice/session" element={<ProtectedRoute>{renderGameSession()}</ProtectedRoute>} />
           <Route path="/study-plan" element={<ProtectedRoute><div className="pt-8"><StudyPlanGenerator /></div></ProtectedRoute>} />
           <Route path="/study-progress" element={<ProtectedRoute><div className="pt-8"><StudyProgress /></div></ProtectedRoute>} />
-          <Route path="/teacher" element={<ProtectedRoute>{renderTeacherDashboard()}</ProtectedRoute>} />
+
+          {/* Teacher-only route */}
+          <Route path="/teacher" element={<ProtectedRoute requiredRole="teacher">{renderTeacherDashboard()}</ProtectedRoute>} />
+
+          <Route path="/classrooms" element={
+            <ProtectedRoute>
+              <div className="max-w-4xl mx-auto py-12 px-4 animate-in fade-in slide-in-from-bottom-4">
+                <h2 className="text-4xl font-display font-bold text-brand-dark mb-8 text-center">Classrooms</h2>
+                {user?.role === 'teacher' ? <ClassroomManager /> : <StudentClassrooms />}
+              </div>
+            </ProtectedRoute>
+          } />
+
           <Route path="*" element={renderHome()} />
         </Routes>
       </main>
@@ -2256,9 +2234,17 @@ export default function App() {
 
           {/* Profile */}
           <button
-            onClick={() => { if (!user) { setShowLoginModal(true); } else { navigate('/dashboard'); } }}
-            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-2xl transition-all ${location.pathname === '/dashboard' ? 'bg-brand-blue/10 text-brand-blue' : 'text-brand-dark/40 hover:text-brand-dark/70'
-              }`}
+            onClick={() => {
+              if (!user) { setShowLoginModal(true); }
+              else if (user.isAdmin) { navigate('/admin'); }
+              else if (user.role === 'teacher') { navigate('/teacher'); }
+              else { navigate('/dashboard'); }
+            }}
+            className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-2xl transition-all ${
+              (location.pathname === '/dashboard' || location.pathname === '/teacher' || location.pathname.startsWith('/admin'))
+                ? 'bg-brand-blue/10 text-brand-blue'
+                : 'text-brand-dark/40 hover:text-brand-dark/70'
+            }`}
           >
             {user ? (
               <div className="w-6 h-6 rounded-full bg-brand-dark text-white flex items-center justify-center font-bold text-xs overflow-hidden">

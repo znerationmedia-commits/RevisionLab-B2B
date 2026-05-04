@@ -5,10 +5,19 @@ import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
-    adminOnly?: boolean;
+    /** If set, only users with this role (or admin) may enter. Others are redirected to their own dashboard. */
+    requiredRole?: 'admin' | 'teacher';
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
+/** Returns the "home" dashboard path for a given user. */
+const getDashboardForUser = (user: { isAdmin?: boolean; role?: string } | null): string => {
+    if (!user) return '/';
+    if (user.isAdmin) return '/admin';
+    if (user.role === 'teacher') return '/teacher';
+    return '/dashboard';
+};
+
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
     const { user, isLoading } = useAuth();
     const location = useLocation();
 
@@ -20,14 +29,23 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminO
         );
     }
 
+    // Not logged in → go home
     if (!user) {
-        // Redirect to home if not logged in
         return <Navigate to="/" state={{ from: location }} replace />;
     }
 
-    if (adminOnly && !user.isAdmin) {
-        // Redirect to home if not admin but trying to access admin route
-        return <Navigate to="/" replace />;
+    // Admin-only route: must have isAdmin flag
+    if (requiredRole === 'admin') {
+        if (!user.isAdmin) {
+            return <Navigate to={getDashboardForUser(user)} replace />;
+        }
+    }
+
+    // Teacher-only route: must have role === 'teacher' (admins are also allowed)
+    if (requiredRole === 'teacher') {
+        if (user.role !== 'teacher' && !user.isAdmin) {
+            return <Navigate to={getDashboardForUser(user)} replace />;
+        }
     }
 
     return <>{children}</>;

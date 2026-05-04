@@ -46,7 +46,7 @@ export const Hero: React.FC<HeroProps> = ({ onStart, onViewPricing, isLoggedIn, 
                 </h1>
 
                 <p className="text-sm sm:text-base lg:text-lg text-white/90 max-w-xl mx-auto leading-relaxed font-medium px-2 animate-reveal-up delay-300 drop-shadow-md">
-                    Master Every Subject. Unlimited Questions for Less Than {priceDisplay}
+                    Master Every Subject. Unlimited Questions for your students.
                 </p>
             </div>
 
@@ -60,17 +60,6 @@ export const Hero: React.FC<HeroProps> = ({ onStart, onViewPricing, isLoggedIn, 
                     {isLoggedIn ? 'Continue Learning' : 'Get Started for Free'}
                     <Rocket className="w-5 h-5 ml-2" />
                 </Button>
-
-                {!isSubscribed && (
-                    <button
-                        onClick={onViewPricing}
-                        className="group flex items-center gap-1.5 font-bold text-white/70 hover:text-white transition-colors text-xs sm:text-sm drop-shadow-sm"
-                    >
-                        <span className="underline decoration-2 decoration-white/30 underline-offset-4 group-hover:decoration-white/70 transition-all">
-                            View Pricing Plans
-                        </span>
-                    </button>
-                )}
             </div>
 
             {/* Trust badges */}

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Question, CustomQuest, Subject, GradeLevel, Syllabus } from '../types';
 import { Button } from './Button';
 import { Card } from './Card';
-import { Plus, Trash2, Save, ArrowLeft, BookOpen, CheckCircle, HelpCircle, Loader2, Sparkles, Layout, List, Settings, Info, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, BookOpen, CheckCircle, HelpCircle, Loader2, Sparkles, Layout, List, Settings, Info, CheckCircle2, Users, Gift } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
+import TeacherRewardsManager from './TeacherRewardsManager';
 
 interface TeacherDashboardProps {
     onBack: () => void;
@@ -252,7 +253,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
             });
 
             if (res.ok) {
-                alert("Quest saved successfully!");
+                alert("Homework saved successfully!");
                 setIsCreating(false);
                 setQuestTitle('');
                 setQuestSubject('');
@@ -266,13 +267,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
             }
         } catch (error) {
             console.error("Failed to save quest", error);
-            alert("Failed to save quest.");
+            alert("Failed to save homework.");
         }
         setIsLoading(false);
     };
 
     const handleDeleteQuest = async (id: string) => {
-        if (confirm("Are you sure you want to delete this quest?")) {
+        if (confirm("Are you sure you want to delete this homework?")) {
             const token = localStorage.getItem('quest_token');
             try {
                 const res = await fetch(`/api/quests/${id}`, {
@@ -282,11 +283,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                 if (res.ok) {
                     fetchQuests();
                 } else {
-                    alert("Failed to delete quest.");
+                    alert("Failed to delete homework.");
                 }
             } catch (error) {
                 console.error(error);
-                alert("Error deleting quest.");
+                alert("Error deleting homework.");
             }
         }
     };
@@ -299,10 +300,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                         <Button variant="outline" size="sm" onClick={() => setIsCreating(false)}>
                             <ArrowLeft size={20} /> Cancel
                         </Button>
-                        <h2 className="text-3xl font-display font-bold text-brand-dark">Create New Quest</h2>
+                        <h2 className="text-3xl font-display font-bold text-brand-dark">Create Homework</h2>
                     </div>
                     <Button onClick={handleSaveQuest} disabled={questions.length === 0 || isLoading} className="bg-brand-green hover:bg-green-600">
-                        {isLoading ? <Loader2 className="animate-spin" /> : <><Save className="mr-2" size={20} /> Save Quest</>}
+                        {isLoading ? <Loader2 className="animate-spin" /> : <><Save className="mr-2" size={20} /> Save Homework</>}
                     </Button>
                 </div>
 
@@ -313,12 +314,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 text-brand-dark/40 mb-2">
                                 <Settings size={14} className="uppercase tracking-widest" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">Quest Configuration</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Homework Configuration</span>
                             </div>
 
                             <Card className="p-5 space-y-4 bg-white/80 backdrop-blur-sm border-brand-dark/5 shadow-sm">
                                 <div>
-                                    <label className="label-text">Quest Title</label>
+                                    <label className="label-text">Homework Title</label>
                                     <input
                                         type="text"
                                         value={questTitle}
@@ -522,7 +523,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                                     {(!user?.isSubscribed && questions.length >= 1) ? (
                                         <><Sparkles className="mr-2" /> Upgrade for Unlimited Questions</>
                                     ) : (
-                                        <><Plus className="mr-2" /> Add Question to Quest</>
+                                        <><Plus className="mr-2" /> Add Question to Homework</>
                                     )}
                                 </Button>
                             </div>
@@ -561,6 +562,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
 
     const creationLimit = !user?.isSubscribed ? 1 : Infinity;
     const canCreate = quests.length < creationLimit;
+    const [dashTab, setDashTab] = useState<'homework' | 'rewards'>('homework');
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-float">
@@ -570,7 +572,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                         <ArrowLeft size={20} /> Back to Home
                     </Button>
                     <div className="flex flex-col">
-                        <h2 className="text-3xl font-display font-bold text-brand-dark">Quest Creator Dashboard</h2>
+                        <h2 className="text-3xl font-display font-bold text-brand-dark">Homework Creator Dashboard</h2>
                         <div className="flex items-center gap-2 mt-1">
                             {user?.isSubscribed ? (
                                 <span className="bg-brand-green/10 text-brand-green text-[10px] font-bold px-2 py-0.5 rounded-full border border-brand-green/20 flex items-center gap-1">
@@ -594,7 +596,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                         <Button
                             onClick={() => setIsCreating(true)}
                         >
-                            <Plus className="mr-2" /> Create New Quest
+                            <Plus className="mr-2" /> Create Homework
                         </Button>
                     ) : (
                         <Button
@@ -606,55 +608,79 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onBack, onVi
                     )}
                     {!user?.isSubscribed && (
                         <span className="text-[10px] font-bold text-brand-orange uppercase">
-                            Free Limit: {quests.length} / 1 Quests
+                            Free Limit: {quests.length} / 1 Homework
                         </span>
                     )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {isLoading ? (
-                    <div className="col-span-full flex justify-center py-10">
-                        <Loader2 className="animate-spin text-brand-blue" size={40} />
-                    </div>
-                ) : quests.length === 0 ? (
-                    <div className="col-span-full text-center py-20 bg-white/50 rounded-3xl border-2 border-dashed border-brand-dark/10">
-                        <div className="w-20 h-20 bg-brand-orange/10 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-orange">
-                            <BookOpen size={40} />
-                        </div>
-                        <h3 className="text-xl font-bold mb-2">No Quests Created Yet</h3>
-                        <p className="text-brand-dark/60 font-medium">Create your first custom quest to get started!</p>
-                    </div>
-                ) : (
-                    quests.map((quest) => (
-                        <Card key={quest.id} className="p-6 hover:shadow-lg transition-all border-2 border-transparent hover:border-brand-blue/20">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="font-bold text-xl">{quest.title}</h3>
-                                    <div className="flex gap-2 text-xs font-bold text-brand-dark/50 mt-1">
-                                        <span className="bg-blue-50 text-brand-blue px-2 py-0.5 rounded">{quest.subject}</span>
-                                        <span className="bg-orange-50 text-brand-orange px-2 py-0.5 rounded">{quest.grade}</span>
-                                    </div>
-                                    <p className="text-sm text-brand-dark/50 font-medium mt-2">
-                                        Created: {new Date(quest.createdAt).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div className="bg-brand-blue/10 text-brand-blue px-3 py-1 rounded-full text-xs font-bold">
-                                    {quest.questions.length} Qs
-                                </div>
-                            </div>
-                            <div className="flex justify-end pt-4 border-t border-brand-dark/5">
-                                <button
-                                    onClick={() => handleDeleteQuest(quest.id)}
-                                    className="text-red-400 hover:text-red-600 flex items-center gap-2 text-sm font-bold transition-colors"
-                                >
-                                    <Trash2 size={16} /> Delete
-                                </button>
-                            </div>
-                        </Card>
-                    ))
-                )}
+            {/* Tab Switcher */}
+            <div className="flex gap-1 bg-brand-dark/5 p-1 rounded-2xl w-fit">
+                <button
+                    onClick={() => setDashTab('homework')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                        dashTab === 'homework' ? 'bg-white shadow text-brand-dark' : 'text-brand-dark/50 hover:text-brand-dark'
+                    }`}
+                >
+                    <BookOpen size={15} /> Homework
+                </button>
+                <button
+                    onClick={() => setDashTab('rewards')}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                        dashTab === 'rewards' ? 'bg-white shadow text-amber-600' : 'text-brand-dark/50 hover:text-brand-dark'
+                    }`}
+                >
+                    <Gift size={15} /> Rewards
+                </button>
             </div>
+
+            {dashTab === 'rewards' ? (
+                <TeacherRewardsManager />
+            ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {isLoading ? (
+                        <div className="col-span-full flex justify-center py-10">
+                            <Loader2 className="animate-spin text-brand-blue" size={40} />
+                        </div>
+                    ) : quests.length === 0 ? (
+                        <div className="col-span-full text-center py-20 bg-white/50 rounded-3xl border-2 border-dashed border-brand-dark/10">
+                            <div className="w-20 h-20 bg-brand-orange/10 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-orange">
+                                <BookOpen size={40} />
+                            </div>
+                            <h3 className="text-xl font-bold mb-2">No Homework Created Yet</h3>
+                            <p className="text-brand-dark/60 font-medium">Create your first homework assignment to get started!</p>
+                        </div>
+                    ) : (
+                        quests.map((quest) => (
+                            <Card key={quest.id} className="p-6 hover:shadow-lg transition-all border-2 border-transparent hover:border-brand-blue/20">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="font-bold text-xl">{quest.title}</h3>
+                                        <div className="flex gap-2 text-xs font-bold text-brand-dark/50 mt-1">
+                                            <span className="bg-blue-50 text-brand-blue px-2 py-0.5 rounded">{quest.subject}</span>
+                                            <span className="bg-orange-50 text-brand-orange px-2 py-0.5 rounded">{quest.grade}</span>
+                                        </div>
+                                        <p className="text-sm text-brand-dark/50 font-medium mt-2">
+                                            Created: {new Date(quest.createdAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <div className="bg-brand-blue/10 text-brand-blue px-3 py-1 rounded-full text-xs font-bold">
+                                        {quest.questions.length} Qs
+                                    </div>
+                                </div>
+                                <div className="flex justify-end pt-4 border-t border-brand-dark/5">
+                                    <button
+                                        onClick={() => handleDeleteQuest(quest.id)}
+                                        className="text-red-400 hover:text-red-600 flex items-center gap-2 text-sm font-bold transition-colors"
+                                    >
+                                        <Trash2 size={16} /> Delete
+                                    </button>
+                                </div>
+                            </Card>
+                        ))
+                    )}
+                </div>
+            )}
         </div>
     );
 };
