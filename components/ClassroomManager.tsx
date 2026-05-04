@@ -31,6 +31,7 @@ export const ClassroomManager: React.FC = () => {
     const [aDesc,      setADesc]              = useState('');
     const [copiedCode, setCopiedCode]         = useState<string|null>(null);
     const [expandedId, setExpandedId]         = useState<string|null>(null);
+    const [panelTab, setPanelTab]             = useState<'assignments'|'performance'>('assignments');
     const [submissions,setSubmissions]        = useState<any[]>([]);
     const [grading,    setGrading]            = useState<Record<string,string>>({});
     const [proofModal, setProofModal]         = useState<string|null>(null);
@@ -219,7 +220,7 @@ export const ClassroomManager: React.FC = () => {
                                         </button>
                                         <button onClick={()=>{
                                             if(isExp){ setExpandedId(null); }
-                                            else { setExpandedId(cls.id); fetchSubs(cls.id); }
+                                            else { setExpandedId(cls.id); setPanelTab('assignments'); fetchSubs(cls.id); }
                                         }} className="flex items-center gap-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-50 transition-all">
                                             <Eye size={13}/>
                                             {isExp?'Hide':'Submissions'}
@@ -228,97 +229,162 @@ export const ClassroomManager: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* ── Submissions panel ── */}
-                                {isExp && (
-                                    <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-3">
-                                        <h5 className="text-xs font-extrabold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                            <Award size={13} className="text-indigo-500"/> Submissions & Grading
-                                        </h5>
+                                {/* ── Submissions & Performance panel ── */}
+                                {isExp && (() => {
+                                    const studentStats: Record<string, {name:string, totalScore:number, gradedCount:number, totalCompleted:number}> = {};
+                                    submissions.forEach(a => {
+                                        a.submissions?.forEach((sub:any) => {
+                                            if (!studentStats[sub.studentId]) studentStats[sub.studentId] = { name: sub.student?.name || 'Unknown', totalScore: 0, gradedCount: 0, totalCompleted: 0 };
+                                            if (sub.status === 'completed') {
+                                                studentStats[sub.studentId].totalCompleted += 1;
+                                                if (sub.score != null) {
+                                                    studentStats[sub.studentId].totalScore += sub.score;
+                                                    studentStats[sub.studentId].gradedCount += 1;
+                                                }
+                                            }
+                                        });
+                                    });
+                                    const roster = Object.values(studentStats)
+                                        .map(s => ({
+                                            name: s.name,
+                                            completed: s.totalCompleted,
+                                            accuracy: s.gradedCount > 0 ? Math.round(s.totalScore / s.gradedCount) : 0
+                                        }))
+                                        .sort((a,b) => b.accuracy - a.accuracy);
 
-                                        {submissions.length===0 ? (
-                                            <div className="text-center py-8 text-slate-400">
-                                                <FileText size={24} className="mx-auto mb-2 opacity-30"/>
-                                                <p className="text-sm font-semibold">No assignments yet.</p>
+                                    return (
+                                        <div className="border-t border-slate-100 bg-slate-50 p-4 space-y-4">
+                                            {/* Tab selector */}
+                                            <div className="flex gap-2 bg-slate-200/50 p-1 rounded-xl w-fit">
+                                                <button onClick={()=>setPanelTab('assignments')}
+                                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${panelTab==='assignments'?'bg-white text-indigo-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}>
+                                                    <ClipboardList size={14}/> Assignments & Grading
+                                                </button>
+                                                <button onClick={()=>setPanelTab('performance')}
+                                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${panelTab==='performance'?'bg-white text-indigo-600 shadow-sm':'text-slate-500 hover:text-slate-700'}`}>
+                                                    <Award size={14}/> Student Performance
+                                                </button>
                                             </div>
-                                        ) : (
-                                            submissions.map(a => {
-                                                const total  = a.submissions?.length||0;
-                                                const graded = a.submissions?.filter((s:any)=>s.status==='completed').length||0;
-                                                const hasPending = a.submissions?.some((s:any)=>s.status==='submitted');
-                                                return (
-                                                    <div key={a.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                                                        {/* assignment header */}
-                                                        <div className={`px-4 py-2.5 flex items-center justify-between ${hasPending?'bg-amber-50 border-b border-amber-100':'bg-slate-50 border-b border-slate-100'}`}>
-                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                <BookOpen size={13} className="text-indigo-400 shrink-0"/>
-                                                                <span className="font-bold text-sm text-slate-800 truncate">{a.title}</span>
-                                                                {!a.questId && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 rounded font-bold shrink-0">Text</span>}
-                                                            </div>
-                                                            <span className="text-[10px] text-slate-400 font-bold shrink-0 ml-2">{graded}/{total} graded</span>
-                                                        </div>
 
-                                                        {/* student rows */}
-                                                        {total===0 ? (
-                                                            <p className="text-xs text-slate-400 italic px-4 py-3">No submissions yet.</p>
-                                                        ) : (
-                                                            <div className="divide-y divide-slate-50">
-                                                                {a.submissions.map((sub:any) => {
-                                                                    const key = `${a.id}-${sub.studentId}`;
-                                                                    const cur = grading[key] ?? (sub.score!=null ? String(sub.score) : '');
-                                                                    const isDeleting = deletingSubId===sub.id;
-                                                                    return (
-                                                                        <div key={sub.id} className="grid grid-cols-12 px-4 py-2.5 items-center gap-2 hover:bg-slate-50 transition-colors">
-                                                                            {/* student */}
-                                                                            <div className="col-span-4 flex items-center gap-2 min-w-0">
-                                                                                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                                                                                    <span className="text-[10px] font-extrabold text-indigo-600">
-                                                                                        {(sub.student?.name||'S').charAt(0).toUpperCase()}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <span className="text-sm font-bold text-slate-700 truncate">{sub.student?.name||'Student'}</span>
-                                                                            </div>
-                                                                            {/* status */}
-                                                                            <div className="col-span-2"><StatusBadge status={sub.status||'pending'}/></div>
-                                                                            {/* proof */}
-                                                                            <div className="col-span-2">
-                                                                                {sub.proofUrl ? (
-                                                                                    <button onClick={()=>setProofModal(sub.proofUrl)} className="group relative">
-                                                                                        <img src={sub.proofUrl} alt="Proof"
-                                                                                            className="w-8 h-8 object-cover rounded-lg border-2 border-indigo-200 group-hover:border-indigo-400 transition-all"/>
-                                                                                    </button>
-                                                                                ) : <span className="text-[10px] text-slate-300">—</span>}
-                                                                            </div>
-                                                                            {/* score */}
-                                                                            <div className="col-span-3 flex items-center gap-1.5">
-                                                                                <input type="number" placeholder="0-100" value={cur} min="0" max="100"
-                                                                                    onChange={e=>setGrading({...grading,[key]:e.target.value})}
-                                                                                    className="w-16 px-2 py-1.5 text-center text-xs font-bold rounded-lg border-2 border-slate-200 focus:border-indigo-400 focus:outline-none"/>
-                                                                                <button onClick={()=>handleGrade(a.id,sub.studentId)}
-                                                                                    className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-all">
-                                                                                    Save
-                                                                                </button>
-                                                                            </div>
-                                                                            {/* dismiss */}
-                                                                            <div className="col-span-1 flex justify-end">
-                                                                                <button
-                                                                                    onClick={()=>handleDeleteSub(sub.id)}
-                                                                                    disabled={isDeleting}
-                                                                                    title="Remove submission"
-                                                                                    className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all disabled:opacity-40">
-                                                                                    {isDeleting ? <Loader2 size={12} className="animate-spin"/> : <Trash2 size={12}/>}
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
+                                            {panelTab === 'assignments' ? (
+                                                submissions.length===0 ? (
+                                                    <div className="text-center py-8 text-slate-400">
+                                                        <FileText size={24} className="mx-auto mb-2 opacity-30"/>
+                                                        <p className="text-sm font-semibold">No assignments yet.</p>
                                                     </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                )}
+                                                ) : (
+                                                    submissions.map(a => {
+                                                        const total  = a.submissions?.length||0;
+                                                        const graded = a.submissions?.filter((s:any)=>s.status==='completed').length||0;
+                                                        const hasPending = a.submissions?.some((s:any)=>s.status==='submitted');
+                                                        return (
+                                                            <div key={a.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden mb-3">
+                                                                {/* assignment header */}
+                                                                <div className={`px-4 py-2.5 flex items-center justify-between ${hasPending?'bg-amber-50 border-b border-amber-100':'bg-slate-50 border-b border-slate-100'}`}>
+                                                                    <div className="flex items-center gap-2 min-w-0">
+                                                                        <BookOpen size={13} className="text-indigo-400 shrink-0"/>
+                                                                        <span className="font-bold text-sm text-slate-800 truncate">{a.title}</span>
+                                                                        {!a.questId && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 rounded font-bold shrink-0">Text</span>}
+                                                                    </div>
+                                                                    <span className="text-[10px] text-slate-400 font-bold shrink-0 ml-2">{graded}/{total} graded</span>
+                                                                </div>
+
+                                                                {/* student rows */}
+                                                                {total===0 ? (
+                                                                    <p className="text-xs text-slate-400 italic px-4 py-3">No submissions yet.</p>
+                                                                ) : (
+                                                                    <div className="divide-y divide-slate-50">
+                                                                        {a.submissions.map((sub:any) => {
+                                                                            const key = `${a.id}-${sub.studentId}`;
+                                                                            const cur = grading[key] ?? (sub.score!=null ? String(sub.score) : '');
+                                                                            const isDeleting = deletingSubId===sub.id;
+                                                                            return (
+                                                                                <div key={sub.id} className="grid grid-cols-12 px-4 py-2.5 items-center gap-2 hover:bg-slate-50 transition-colors">
+                                                                                    {/* student */}
+                                                                                    <div className="col-span-4 flex items-center gap-2 min-w-0">
+                                                                                        <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                                                                                            <span className="text-[10px] font-extrabold text-indigo-600">
+                                                                                                {(sub.student?.name||'S').charAt(0).toUpperCase()}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <span className="text-sm font-bold text-slate-700 truncate">{sub.student?.name||'Student'}</span>
+                                                                                    </div>
+                                                                                    {/* status */}
+                                                                                    <div className="col-span-2"><StatusBadge status={sub.status||'pending'}/></div>
+                                                                                    {/* proof */}
+                                                                                    <div className="col-span-2">
+                                                                                        {sub.proofUrl ? (
+                                                                                            <button onClick={()=>setProofModal(sub.proofUrl)} className="group relative">
+                                                                                                <img src={sub.proofUrl} alt="Proof"
+                                                                                                    className="w-8 h-8 object-cover rounded-lg border-2 border-indigo-200 group-hover:border-indigo-400 transition-all"/>
+                                                                                            </button>
+                                                                                        ) : <span className="text-[10px] text-slate-300">—</span>}
+                                                                                    </div>
+                                                                                    {/* score */}
+                                                                                    <div className="col-span-3 flex items-center gap-1.5">
+                                                                                        <input type="number" placeholder="0-100" value={cur} min="0" max="100"
+                                                                                            onChange={e=>setGrading({...grading,[key]:e.target.value})}
+                                                                                            className="w-16 px-2 py-1.5 text-center text-xs font-bold rounded-lg border-2 border-slate-200 focus:border-indigo-400 focus:outline-none"/>
+                                                                                        <button onClick={()=>handleGrade(a.id,sub.studentId)}
+                                                                                            className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-all">
+                                                                                            Save
+                                                                                        </button>
+                                                                                    </div>
+                                                                                    {/* dismiss */}
+                                                                                    <div className="col-span-1 flex justify-end">
+                                                                                        <button
+                                                                                            onClick={()=>handleDeleteSub(sub.id)}
+                                                                                            disabled={isDeleting}
+                                                                                            title="Remove submission"
+                                                                                            className="p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all disabled:opacity-40">
+                                                                                            {isDeleting ? <Loader2 size={12} className="animate-spin"/> : <Trash2 size={12}/>}
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )
+                                            ) : (
+                                                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                                        <span className="font-bold text-sm text-slate-800">Leaderboard & Accuracy</span>
+                                                    </div>
+                                                    {roster.length === 0 ? (
+                                                        <p className="text-xs text-slate-400 italic px-4 py-6 text-center">No graded submissions yet to calculate accuracy.</p>
+                                                    ) : (
+                                                        <div className="divide-y divide-slate-50">
+                                                            {roster.map((student, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-extrabold text-xs
+                                                                            ${idx===0?'bg-amber-100 text-amber-600':idx===1?'bg-slate-200 text-slate-600':idx===2?'bg-orange-100 text-orange-600':'bg-indigo-50 text-indigo-500'}`}>
+                                                                            #{idx+1}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-slate-700">{student.name}</p>
+                                                                            <p className="text-[10px] font-semibold text-slate-400">{student.completed} assignments completed</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p className={`text-lg font-extrabold ${student.accuracy >= 80 ? 'text-emerald-500' : student.accuracy >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                                                            {student.accuracy}%
+                                                                        </p>
+                                                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accuracy</p>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         );
                     })}
