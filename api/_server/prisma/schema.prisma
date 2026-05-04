@@ -71,6 +71,7 @@ model User {
   teachingClassrooms Classroom[] @relation("TeacherClassrooms")
   studentClassrooms  Classroom[] @relation("StudentClassrooms")
   submissions        AssignmentSubmission[] @relation("StudentSubmissions")
+  createdRewards     Reward[] @relation("TeacherRewards")
 }
 
 model Reward {
@@ -83,6 +84,8 @@ model Reward {
   stock       Int?         // Null means unlimited
   isActive    Boolean      @default(true)
   createdAt   DateTime     @default(now())
+  creatorId   String?
+  creator     User?        @relation("TeacherRewards", fields: [creatorId], references: [id])
   redemptions Redemption[]
 }
 

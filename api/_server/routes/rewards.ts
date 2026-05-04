@@ -6,9 +6,24 @@ const router = express.Router();
 
 // GET /api/rewards — list all active rewards (authenticated users)
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
-    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { studentClassrooms: true }
+        });
+
+        const teacherIds = user?.studentClassrooms.map(c => c.teacherId) || [];
+
         const rewards = await prisma.reward.findMany({
-            where: { isActive: true },
+            where: { 
+                isActive: true,
+                OR: [
+                    { creatorId: null },
+                    { creatorId: { in: teacherIds } }
+                ]
+            },
             orderBy: { coinCost: 'asc' }
         });
         res.json(rewards);
@@ -21,7 +36,18 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 // GET /api/rewards/all — list ALL rewards incl. inactive (teacher management)
 router.get('/all', authenticateToken, async (req: AuthRequest, res) => {
     try {
-        const rewards = await prisma.reward.findMany({ orderBy: { coinCost: 'asc' } });
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        const isAdmin = user?.isAdmin || false;
+
+        const whereClause = isAdmin ? {} : { creatorId: userId };
+
+        const rewards = await prisma.reward.findMany({ 
+            where: whereClause,
+            orderBy: { coinCost: 'asc' } 
+        });
         res.json(rewards);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch rewards' });
@@ -31,9 +57,12 @@ router.get('/all', authenticateToken, async (req: AuthRequest, res) => {
 // POST /api/rewards — create a new reward (teacher)
 router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     const { title, description, icon, coinCost, stock, imageUrl } = req.body;
+    const userId = req.user?.id;
     if (!title || !description || coinCost === undefined) {
         return res.status(400).json({ error: 'title, description and coinCost are required' });
     }
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
         const reward = await prisma.reward.create({
             data: {
@@ -44,6 +73,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
                 stock: stock !== undefined && stock !== '' ? parseInt(stock) : null,
                 imageUrl: imageUrl || null,
                 isActive: true,
+                creatorId: userId
             }
         });
         res.json(reward);
@@ -57,7 +87,18 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
 router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
     const { id } = req.params;
     const { title, description, icon, coinCost, stock, imageUrl, isActive } = req.body;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
+        const current = await prisma.reward.findUnique({ where: { id } });
+        if (!current) return res.status(404).json({ error: 'Reward not found' });
+        
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (current.creatorId !== userId && !user?.isAdmin) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const reward = await prisma.reward.update({
             where: { id },
             data: {
@@ -80,9 +121,18 @@ router.put('/:id', authenticateToken, async (req: AuthRequest, res) => {
 // PATCH /api/rewards/:id/toggle — toggle active/inactive
 router.patch('/:id/toggle', authenticateToken, async (req: AuthRequest, res) => {
     const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
         const current = await prisma.reward.findUnique({ where: { id } });
         if (!current) return res.status(404).json({ error: 'Reward not found' });
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (current.creatorId !== userId && !user?.isAdmin) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         const updated = await prisma.reward.update({ where: { id }, data: { isActive: !current.isActive } });
         res.json(updated);
     } catch (error) {
@@ -93,7 +143,18 @@ router.patch('/:id/toggle', authenticateToken, async (req: AuthRequest, res) => 
 // DELETE /api/rewards/:id — delete a reward (teacher)
 router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
     try {
+        const current = await prisma.reward.findUnique({ where: { id } });
+        if (!current) return res.status(404).json({ error: 'Reward not found' });
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (current.creatorId !== userId && !user?.isAdmin) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
         await prisma.reward.delete({ where: { id } });
         res.json({ success: true });
     } catch (error) {
